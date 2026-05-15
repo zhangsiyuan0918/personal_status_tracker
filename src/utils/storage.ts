@@ -71,6 +71,10 @@ export function getAllRecords(): StateRecord[] {
   return readRecords()
 }
 
+export function replaceAllRecords(records: StateRecord[]): boolean {
+  return writeRecords(records)
+}
+
 export function getRecordByDate(date: string): StateRecord | null {
   const records = readRecords()
   return records.find((record) => record.date === date) ?? null
