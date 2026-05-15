@@ -83,7 +83,7 @@ function App() {
           </p>
         </header>
 
-        <main className="flex-1 px-4 py-5">{page}</main>
+        <main className="flex-1 px-4 py-5 pb-28">{page}</main>
 
         <BottomNav
           activeTab={activeTab}
