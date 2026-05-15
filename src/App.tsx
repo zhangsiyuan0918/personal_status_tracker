@@ -12,11 +12,13 @@ import { getRecordByDate } from './utils/storage'
 function App() {
   const [activeTab, setActiveTab] = useState<NavKey>('record')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [editingDate, setEditingDate] = useState<string | null>(null)
 
   const today = getTodayDate()
   const todayRecord = useMemo<StateRecord | null>(() => getRecordByDate(today), [today, refreshKey])
 
   const handleGoToRecord = useCallback(() => {
+    setEditingDate(null)
     setActiveTab('record')
   }, [])
 
@@ -24,25 +26,49 @@ function App() {
     setRefreshKey((value) => value + 1)
   }, [])
 
-  const handleRecordSaved = useCallback(() => {
-    handleDataChanged()
-    setActiveTab('dashboard')
-  }, [handleDataChanged])
+  const handleEditRecord = useCallback((date: string) => {
+    setEditingDate(date)
+    setActiveTab('record')
+  }, [])
+
+  const handleRecordSaved = useCallback(
+    (savedDate: string) => {
+      handleDataChanged()
+      setEditingDate(null)
+      setActiveTab(savedDate === today ? 'dashboard' : 'trends')
+    },
+    [handleDataChanged, today],
+  )
 
   const page = useMemo(() => {
     switch (activeTab) {
       case 'record':
-        return <RecordPage onSaved={handleRecordSaved} />
+        return <RecordPage editingDate={editingDate} onSaved={handleRecordSaved} />
       case 'dashboard':
         return <DashboardPage record={todayRecord} onGoToRecord={handleGoToRecord} />
       case 'trends':
-        return <TrendsPage refreshKey={refreshKey} onDataChanged={handleDataChanged} />
+        return (
+          <TrendsPage
+            refreshKey={refreshKey}
+            onDataChanged={handleDataChanged}
+            onEditRecord={handleEditRecord}
+          />
+        )
       case 'settings':
         return <SettingsPage refreshKey={refreshKey} onDataChanged={handleDataChanged} />
       default:
         return null
     }
-  }, [activeTab, handleDataChanged, handleGoToRecord, handleRecordSaved, refreshKey, todayRecord])
+  }, [
+    activeTab,
+    editingDate,
+    handleDataChanged,
+    handleEditRecord,
+    handleGoToRecord,
+    handleRecordSaved,
+    refreshKey,
+    todayRecord,
+  ])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -53,13 +79,21 @@ function App() {
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-white">个人状态记录器</h1>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            当前已接入记录、面板、趋势、历史与设置等完整基础能力。
+            当前已接入记录、面板、趋势、历史、编辑与设置等完整基础能力。
           </p>
         </header>
 
         <main className="flex-1 px-4 py-5">{page}</main>
 
-        <BottomNav activeTab={activeTab} onChange={setActiveTab} />
+        <BottomNav
+          activeTab={activeTab}
+          onChange={(tab) => {
+            if (tab !== 'record') {
+              setEditingDate(null)
+            }
+            setActiveTab(tab)
+          }}
+        />
       </div>
     </div>
   )

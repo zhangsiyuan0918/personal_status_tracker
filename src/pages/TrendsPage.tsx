@@ -19,13 +19,13 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip,
 interface TrendsPageProps {
   refreshKey: number
   onDataChanged: () => void
+  onEditRecord: (date: string) => void
 }
 
 type TrendsTab = 'chart' | 'history'
 type RangeKey = '7' | '30'
 
-const tabButtonClass =
-  'rounded-2xl px-4 py-2 text-sm transition'
+const tabButtonClass = 'rounded-2xl px-4 py-2 text-sm transition'
 const activeTabClass = 'bg-sky-500/15 text-sky-300'
 const inactiveTabClass = 'bg-slate-950/80 text-slate-400 hover:text-white'
 
@@ -36,14 +36,17 @@ const metricConfigs = [
   { key: 'stability', label: '情绪稳定值', color: '#22d3ee' },
 ] as const
 
-export function TrendsPage({ refreshKey, onDataChanged }: TrendsPageProps) {
+export function TrendsPage({ refreshKey, onDataChanged, onEditRecord }: TrendsPageProps) {
   const [activeTab, setActiveTab] = useState<TrendsTab>('chart')
   const [range, setRange] = useState<RangeKey>('7')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const records = useMemo(() => getAllRecords(), [refreshKey])
   const trendRecords = useMemo(
-    () => (range === '7' ? getRecent7DaysRecords(records).reverse() : getRecent30DaysRecords(records).reverse()),
+    () =>
+      range === '7'
+        ? getRecent7DaysRecords(records).reverse()
+        : getRecent30DaysRecords(records).reverse(),
     [range, records],
   )
 
@@ -201,8 +204,8 @@ export function TrendsPage({ refreshKey, onDataChanged }: TrendsPageProps) {
                   >
                     <p className="text-base font-semibold text-white">{record.date}</p>
                     <p className="mt-2 text-sm leading-6 text-slate-300">
-                      能量 {record.energy}｜火苗 {record.spark}｜行动 {record.action}｜连接 {record.connection}
-                      ｜表达 {record.expression}｜稳定 {record.stability}
+                      能量 {record.energy}｜火苗 {record.spark}｜行动 {record.action}｜连接{' '}
+                      {record.connection}｜表达 {record.expression}｜稳定 {record.stability}
                     </p>
                     <p className="mt-2 text-xs text-slate-500">
                       状态：{statuses.map((status) => status.name).join(' / ')}
@@ -216,6 +219,13 @@ export function TrendsPage({ refreshKey, onDataChanged }: TrendsPageProps) {
                       className="rounded-2xl border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:text-white"
                     >
                       {isExpanded ? '收起详情' : '查看详情'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEditRecord(record.date)}
+                      className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200"
+                    >
+                      编辑
                     </button>
                     <button
                       type="button"
@@ -235,7 +245,9 @@ export function TrendsPage({ refreshKey, onDataChanged }: TrendsPageProps) {
                         <p className="mt-1">{record.positiveNote || '未填写'}</p>
                       </div>
                       <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">今天消耗我的事</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                          今天消耗我的事
+                        </p>
                         <p className="mt-1">{record.drainNote || '未填写'}</p>
                       </div>
                       <div>

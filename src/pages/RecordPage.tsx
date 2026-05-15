@@ -4,7 +4,8 @@ import { getTodayDate } from '../utils/date'
 import { getRecordByDate, saveRecord } from '../utils/storage'
 
 interface RecordPageProps {
-  onSaved: () => void
+  editingDate?: string | null
+  onSaved: (savedDate: string) => void
 }
 
 type MetricKey =
@@ -28,12 +29,12 @@ interface RecordFormState {
 }
 
 const metrics: Array<{ key: MetricKey; label: string; color: string }> = [
-  { key: 'energy', label: '能量值', color: 'accent-color:#34d399' },
-  { key: 'spark', label: '火苗值', color: 'accent-color:#fbbf24' },
-  { key: 'action', label: '行动力', color: 'accent-color:#38bdf8' },
-  { key: 'connection', label: '连接值', color: 'accent-color:#a78bfa' },
-  { key: 'expression', label: '表达值', color: 'accent-color:#f472b6' },
-  { key: 'stability', label: '情绪稳定值', color: 'accent-color:#22d3ee' },
+  { key: 'energy', label: '能量值', color: '#34d399' },
+  { key: 'spark', label: '火苗值', color: '#fbbf24' },
+  { key: 'action', label: '行动力', color: '#38bdf8' },
+  { key: 'connection', label: '连接值', color: '#a78bfa' },
+  { key: 'expression', label: '表达值', color: '#f472b6' },
+  { key: 'stability', label: '情绪稳定值', color: '#22d3ee' },
 ]
 
 const defaultFormState: RecordFormState = {
@@ -50,7 +51,7 @@ const defaultFormState: RecordFormState = {
 
 function toFormState(record: StateRecord | null): RecordFormState {
   if (!record) {
-    return defaultFormState
+    return { ...defaultFormState }
   }
 
   return {
@@ -66,15 +67,19 @@ function toFormState(record: StateRecord | null): RecordFormState {
   }
 }
 
-export function RecordPage({ onSaved }: RecordPageProps) {
+export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   const today = getTodayDate()
-  const [form, setForm] = useState<RecordFormState>(defaultFormState)
+  const targetDate = editingDate ?? today
+  const isEditingHistory = targetDate !== today
+
+  const [form, setForm] = useState<RecordFormState>({ ...defaultFormState })
   const [saveMessage, setSaveMessage] = useState('')
 
   useEffect(() => {
-    const todayRecord = getRecordByDate(today)
-    setForm(toFormState(todayRecord))
-  }, [today])
+    const targetRecord = getRecordByDate(targetDate)
+    setForm(toFormState(targetRecord))
+    setSaveMessage('')
+  }, [targetDate])
 
   const handleMetricChange = (key: MetricKey, value: number) => {
     setForm((current) => ({
@@ -83,7 +88,10 @@ export function RecordPage({ onSaved }: RecordPageProps) {
     }))
   }
 
-  const handleTextChange = (key: keyof Pick<RecordFormState, 'positiveNote' | 'drainNote' | 'actionNote'>, value: string) => {
+  const handleTextChange = (
+    key: keyof Pick<RecordFormState, 'positiveNote' | 'drainNote' | 'actionNote'>,
+    value: string,
+  ) => {
     setForm((current) => ({
       ...current,
       [key]: value,
@@ -91,11 +99,11 @@ export function RecordPage({ onSaved }: RecordPageProps) {
   }
 
   const handleSave = () => {
-    const existingRecord = getRecordByDate(today)
+    const existingRecord = getRecordByDate(targetDate)
 
     const record: StateRecord = {
-      id: existingRecord?.id ?? today,
-      date: today,
+      id: existingRecord?.id ?? targetDate,
+      date: targetDate,
       energy: form.energy,
       spark: form.spark,
       action: form.action,
@@ -116,17 +124,19 @@ export function RecordPage({ onSaved }: RecordPageProps) {
       return
     }
 
-    setSaveMessage('已保存今日状态')
-    onSaved()
+    setSaveMessage(isEditingHistory ? '已更新该日记录' : '已保存今日状态')
+    onSaved(targetDate)
   }
 
   return (
     <section className="space-y-4">
       <div className="rounded-3xl border border-slate-800 bg-slate-900 px-4 py-4">
-        <p className="text-sm text-slate-400">今天是：{today}</p>
-        <h2 className="mt-1 text-xl font-semibold text-white">今日记录</h2>
+        <p className="text-sm text-slate-400">{isEditingHistory ? '编辑日期' : '今天是'}：{targetDate}</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">
+          {isEditingHistory ? '编辑历史记录' : '今日记录'}
+        </h2>
         <p className="mt-2 text-sm leading-6 text-slate-400">
-          每项默认值为 5。如果今天已有记录，会自动回填到表单中。
+          每项默认值为 5。若该日期已有记录，会自动回填并在保存时覆盖原记录。
         </p>
       </div>
 
@@ -146,7 +156,7 @@ export function RecordPage({ onSaved }: RecordPageProps) {
                 value={form[metric.key]}
                 onChange={(event) => handleMetricChange(metric.key, Number(event.target.value))}
                 className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-800"
-                style={{ accentColor: metric.color.split(':')[1] }}
+                style={{ accentColor: metric.color }}
               />
             </label>
           ))}
@@ -194,7 +204,7 @@ export function RecordPage({ onSaved }: RecordPageProps) {
           onClick={handleSave}
           className="w-full rounded-2xl bg-sky-500 px-4 py-3 text-sm font-medium text-slate-950 shadow-lg shadow-sky-950/40 transition hover:bg-sky-400"
         >
-          保存今日记录
+          {isEditingHistory ? '保存这一天的修改' : '保存今日记录'}
         </button>
 
         {saveMessage ? <p className="text-center text-sm text-slate-400">{saveMessage}</p> : null}
