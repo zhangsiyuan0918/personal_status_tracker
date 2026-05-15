@@ -1,0 +1,1 @@
+export type NavKey = 'record' | 'dashboard' | 'trends' | 'settings'
