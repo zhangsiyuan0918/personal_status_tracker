@@ -6,8 +6,8 @@ import { SettingsPage } from './pages/SettingsPage'
 import { TrendsPage } from './pages/TrendsPage'
 import type { NavKey } from './types'
 import type { StateRecord } from './types/record'
+import { getAllRecords, getRecordByDate } from './utils/storage'
 import { getTodayDate } from './utils/date'
-import { getRecordByDate } from './utils/storage'
 
 function App() {
   const [activeTab, setActiveTab] = useState<NavKey>('record')
@@ -15,12 +15,13 @@ function App() {
   const [editingDate, setEditingDate] = useState<string | null>(null)
 
   const today = getTodayDate()
+  const allRecords = useMemo(() => getAllRecords(), [refreshKey])
   const todayRecord = useMemo<StateRecord | null>(() => getRecordByDate(today), [today, refreshKey])
 
   const handleGoToRecord = useCallback(() => {
-    setEditingDate(null)
+    setEditingDate(today)
     setActiveTab('record')
-  }, [])
+  }, [today])
 
   const handleDataChanged = useCallback(() => {
     setRefreshKey((value) => value + 1)
@@ -34,8 +35,8 @@ function App() {
   const handleRecordSaved = useCallback(
     (savedDate: string) => {
       handleDataChanged()
-      setEditingDate(null)
-      setActiveTab(savedDate === today ? 'dashboard' : 'trends')
+      setEditingDate(savedDate)
+      setActiveTab(savedDate === today ? 'dashboard' : 'record')
     },
     [handleDataChanged, today],
   )
@@ -45,7 +46,14 @@ function App() {
       case 'record':
         return <RecordPage editingDate={editingDate} onSaved={handleRecordSaved} />
       case 'dashboard':
-        return <DashboardPage record={todayRecord} onGoToRecord={handleGoToRecord} />
+        return (
+          <DashboardPage
+            record={todayRecord}
+            records={allRecords}
+            onGoToRecord={handleGoToRecord}
+            onSelectDate={handleEditRecord}
+          />
+        )
       case 'trends':
         return (
           <TrendsPage
@@ -61,6 +69,7 @@ function App() {
     }
   }, [
     activeTab,
+    allRecords,
     editingDate,
     handleDataChanged,
     handleEditRecord,

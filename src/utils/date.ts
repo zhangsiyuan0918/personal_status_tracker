@@ -51,6 +51,16 @@ export function getRelativeDateLabel(date: string): string {
   return date
 }
 
+export function getRecentDateStrings(days: number): string[] {
+  const dates: string[] = []
+
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    dates.push(getDateDaysAgoString(offset))
+  }
+
+  return dates
+}
+
 export function sortRecordsByDateDesc(records: StateRecord[]): StateRecord[] {
   return [...records].sort((a, b) => b.date.localeCompare(a.date))
 }
