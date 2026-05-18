@@ -16,10 +16,39 @@ export function getTodayDate(): string {
   return formatDate(new Date())
 }
 
+export function getDateDaysAgoString(days: number): string {
+  const target = new Date()
+  target.setDate(target.getDate() - days)
+  return formatDate(target)
+}
+
 export function getYesterdayString(): string {
-  const yesterday = new Date()
-  yesterday.setDate(yesterday.getDate() - 1)
-  return formatDate(yesterday)
+  return getDateDaysAgoString(1)
+}
+
+export function isSelectableRecordDate(date: string): boolean {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/
+
+  if (!datePattern.test(date)) {
+    return false
+  }
+
+  const min = getDateDaysAgoString(30)
+  const max = getTodayDate()
+
+  return date >= min && date <= max
+}
+
+export function getRelativeDateLabel(date: string): string {
+  if (date === getTodayDate()) {
+    return '今天'
+  }
+
+  if (date === getYesterdayString()) {
+    return '昨天'
+  }
+
+  return date
 }
 
 export function sortRecordsByDateDesc(records: StateRecord[]): StateRecord[] {

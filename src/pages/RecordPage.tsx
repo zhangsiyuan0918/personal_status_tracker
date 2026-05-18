@@ -5,7 +5,13 @@ import {
   type QuickStateOption,
 } from '../constants/quickStates'
 import type { StateRecord } from '../types/record'
-import { getTodayDate, getYesterdayString } from '../utils/date'
+import {
+  getDateDaysAgoString,
+  getRelativeDateLabel,
+  getTodayDate,
+  getYesterdayString,
+  isSelectableRecordDate,
+} from '../utils/date'
 import { getPrimaryStatus } from '../utils/statusRules'
 import { getRecordByDate, saveRecord } from '../utils/storage'
 
@@ -103,8 +109,11 @@ function getQuickStateSelection(
 export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   const today = getTodayDate()
   const yesterday = getYesterdayString()
+  const minDate = getDateDaysAgoString(30)
 
-  const initialDate = editingDate === yesterday ? yesterday : today
+  const initialDate =
+    editingDate && isSelectableRecordDate(editingDate) ? editingDate : today
+
   const [selectedDate, setSelectedDate] = useState(initialDate)
   const [recordMode, setRecordMode] = useState<RecordMode>('simple')
   const [quickSelections, setQuickSelections] = useState<Record<QuickStateGroupKey, string | null>>({
@@ -117,8 +126,12 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   const [showNotes, setShowNotes] = useState(false)
   const [form, setForm] = useState<RecordFormState>({ ...defaultFormState })
   const [feedbackRecord, setFeedbackRecord] = useState<StateRecord | null>(null)
+  const [dateMessage, setDateMessage] = useState('')
 
+  const isToday = selectedDate === today
   const isYesterday = selectedDate === yesterday
+  const targetRecord = useMemo(() => getRecordByDate(selectedDate), [selectedDate])
+
   const visibleMetrics = useMemo(
     () =>
       recordMode === 'full'
@@ -132,14 +145,30 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   }, [initialDate])
 
   useEffect(() => {
-    const targetRecord = getRecordByDate(selectedDate)
+    if (!isSelectableRecordDate(selectedDate)) {
+      setDateMessage('只能补记最近 30 天内的状态。')
+      return
+    }
+
     setForm(toFormState(targetRecord))
     setRecordMode(targetRecord?.mode ?? 'simple')
     setQuickSelections(getQuickStateSelection(targetRecord))
     setShowDetailedScores(false)
     setShowNotes(false)
     setFeedbackRecord(null)
-  }, [selectedDate])
+    setDateMessage(
+      targetRecord ? '正在编辑这一天的记录。' : '这一天还没有记录。可以凭印象补一个大概状态。',
+    )
+  }, [selectedDate, targetRecord])
+
+  const handleSelectDate = (nextDate: string) => {
+    if (!isSelectableRecordDate(nextDate)) {
+      setDateMessage('只能补记最近 30 天内的状态。')
+      return
+    }
+
+    setSelectedDate(nextDate)
+  }
 
   const handleMetricChange = (key: MetricKey, value: number) => {
     setForm((current) => ({
@@ -171,6 +200,12 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   }
 
   const handleSave = () => {
+    if (!isSelectableRecordDate(selectedDate)) {
+      setDateMessage('只能补记最近 30 天内的状态。')
+      setFeedbackRecord(null)
+      return
+    }
+
     const existingRecord = getRecordByDate(selectedDate)
     const isSimpleMode = recordMode === 'simple'
     const quickStateKeys = Object.values(quickSelections).filter((value): value is string =>
@@ -223,7 +258,7 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
             <button
               key={item.key}
               type="button"
-              onClick={() => setSelectedDate(item.key)}
+              onClick={() => handleSelectDate(item.key)}
               className={`rounded-2xl px-4 py-2 text-sm transition ${
                 selectedDate === item.key
                   ? 'bg-sky-500/15 text-sky-300'
@@ -234,6 +269,27 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
             </button>
           ))}
         </div>
+
+        <div className="mt-3">
+          <input
+            type="date"
+            min={minDate}
+            max={today}
+            value={selectedDate}
+            onChange={(event) => handleSelectDate(event.target.value)}
+            className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm text-slate-100 outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <p className="mt-3 text-sm leading-6 text-slate-300">
+          当前记录日期：{getRelativeDateLabel(selectedDate)}
+        </p>
+        {!isToday ? (
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            补记不用太精确，留下大概状态就够了。
+          </p>
+        ) : null}
+        {dateMessage ? <p className="mt-2 text-sm leading-6 text-slate-400">{dateMessage}</p> : null}
       </div>
 
       <div className="space-y-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
@@ -389,7 +445,7 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
       {feedbackRecord && primaryStatus ? (
         <div className="rounded-3xl border border-sky-500/30 bg-sky-500/10 p-4">
           <p className="text-sm font-medium text-sky-200">
-            {isYesterday ? '已保存昨天状态' : '已保存今日状态'}
+            {isYesterday ? '已保存昨天状态' : isToday ? '已保存今日状态' : `已保存 ${selectedDate} 的状态`}
           </p>
           <p className="mt-3 text-base font-semibold text-white">当前状态：{primaryStatus.name}</p>
           <p className="mt-2 text-sm leading-6 text-slate-300">{primaryStatus.message}</p>
