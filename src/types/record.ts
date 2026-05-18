@@ -13,6 +13,9 @@ export interface StateRecord {
   drainNote?: string
   actionNote?: string
 
+  mode?: 'full' | 'simple'
+  templateKey?: string
+
   createdAt: string
   updatedAt: string
 }

@@ -1,16 +1,8 @@
 import { useRef, useState } from 'react'
 import { createJsonExport, exportRecordsAsJson } from '../utils/export'
 import { getTodayDate } from '../utils/date'
-import {
-  clearRecords,
-  getAllRecords,
-  replaceAllRecords,
-} from '../utils/storage'
-import {
-  mergeRecords,
-  parseJsonFileText,
-  validateImportedRecords,
-} from '../utils/import'
+import { clearRecords, getAllRecords, replaceAllRecords } from '../utils/storage'
+import { mergeRecords, parseJsonFileText, validateImportedRecords } from '../utils/import'
 
 interface SettingsPageProps {
   refreshKey: number
@@ -92,8 +84,7 @@ export function SettingsPage({ refreshKey, onDataChanged }: SettingsPageProps) {
       )
       onDataChanged()
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : '导入失败：文件读取失败。'
+      const errorMessage = error instanceof Error ? error.message : '导入失败：文件读取失败。'
       setMessage(errorMessage)
     } finally {
       event.target.value = ''
@@ -127,6 +118,19 @@ export function SettingsPage({ refreshKey, onDataChanged }: SettingsPageProps) {
           当前记录总数：{totalRecords} 条（刷新标记：{refreshKey}）
         </p>
         {message ? <p className="mt-3 text-sm leading-6 text-sky-300">{message}</p> : null}
+      </div>
+
+      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+        <h3 className="text-sm font-medium text-slate-200">记录习惯说明</h3>
+        <div className="mt-3 rounded-2xl bg-slate-950/80 p-4 text-sm leading-6 text-slate-300">
+          这个工具不要求你每天认真填写。
+          <br />
+          状态不好时，可以使用极简模式或快速模板。
+          <br />
+          记录的目标不是打卡，而是留下足够多的状态点。
+          <br />
+          即使一周只记录 3-5 次，也能帮助你观察趋势。
+        </div>
       </div>
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">

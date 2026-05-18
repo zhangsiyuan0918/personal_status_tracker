@@ -68,3 +68,7 @@ export function getStatuses(record: StateRecord): StatusResult[] {
 
   return matchedStatuses
 }
+
+export function getPrimaryStatus(record: StateRecord): StatusResult {
+  return getStatuses(record)[0]
+}

@@ -16,6 +16,12 @@ export function getTodayDate(): string {
   return formatDate(new Date())
 }
 
+export function getYesterdayString(): string {
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  return formatDate(yesterday)
+}
+
 export function sortRecordsByDateDesc(records: StateRecord[]): StateRecord[] {
   return [...records].sort((a, b) => b.date.localeCompare(a.date))
 }
