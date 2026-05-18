@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { QUICK_TEMPLATES } from '../constants/templates'
+import {
+  QUICK_STATE_GROUPS,
+  type QuickStateGroupKey,
+  type QuickStateOption,
+} from '../constants/quickStates'
 import type { StateRecord } from '../types/record'
 import { getTodayDate, getYesterdayString } from '../utils/date'
 import { getPrimaryStatus } from '../utils/statusRules'
@@ -73,14 +77,44 @@ function toFormState(record: StateRecord | null): RecordFormState {
   }
 }
 
+function getQuickStateSelection(
+  record: StateRecord | null,
+): Record<QuickStateGroupKey, string | null> {
+  const result: Record<QuickStateGroupKey, string | null> = {
+    energy: null,
+    progress: null,
+    connection: null,
+    mind: null,
+  }
+
+  for (const key of record?.quickStateKeys ?? []) {
+    const matchedGroup = QUICK_STATE_GROUPS.find((group) =>
+      group.options.some((option) => option.key === key),
+    )
+
+    if (matchedGroup) {
+      result[matchedGroup.key] = key
+    }
+  }
+
+  return result
+}
+
 export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   const today = getTodayDate()
   const yesterday = getYesterdayString()
 
   const initialDate = editingDate === yesterday ? yesterday : today
   const [selectedDate, setSelectedDate] = useState(initialDate)
-  const [recordMode, setRecordMode] = useState<RecordMode>('full')
-  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string | null>(null)
+  const [recordMode, setRecordMode] = useState<RecordMode>('simple')
+  const [quickSelections, setQuickSelections] = useState<Record<QuickStateGroupKey, string | null>>({
+    energy: null,
+    progress: null,
+    connection: null,
+    mind: null,
+  })
+  const [showDetailedScores, setShowDetailedScores] = useState(false)
+  const [showNotes, setShowNotes] = useState(false)
   const [form, setForm] = useState<RecordFormState>({ ...defaultFormState })
   const [feedbackRecord, setFeedbackRecord] = useState<StateRecord | null>(null)
 
@@ -100,8 +134,10 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   useEffect(() => {
     const targetRecord = getRecordByDate(selectedDate)
     setForm(toFormState(targetRecord))
-    setRecordMode(targetRecord?.mode ?? 'full')
-    setSelectedTemplateKey(targetRecord?.templateKey ?? null)
+    setRecordMode(targetRecord?.mode ?? 'simple')
+    setQuickSelections(getQuickStateSelection(targetRecord))
+    setShowDetailedScores(false)
+    setShowNotes(false)
     setFeedbackRecord(null)
   }, [selectedDate])
 
@@ -122,38 +158,40 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
     }))
   }
 
-  const handleTemplateClick = (templateKey: string) => {
-    const template = QUICK_TEMPLATES.find((item) => item.key === templateKey)
+  const handleQuickStateSelect = (groupKey: QuickStateGroupKey, option: QuickStateOption) => {
+    setQuickSelections((current) => ({
+      ...current,
+      [groupKey]: option.key,
+    }))
 
-    if (!template) {
-      return
-    }
-
-    setSelectedTemplateKey(template.key)
     setForm((current) => ({
       ...current,
-      ...template.values,
+      ...option.values,
     }))
   }
 
   const handleSave = () => {
     const existingRecord = getRecordByDate(selectedDate)
     const isSimpleMode = recordMode === 'simple'
+    const quickStateKeys = Object.values(quickSelections).filter((value): value is string =>
+      Boolean(value),
+    )
 
     const record: StateRecord = {
       id: existingRecord?.id ?? selectedDate,
       date: selectedDate,
       energy: form.energy,
       spark: form.spark,
-      action: isSimpleMode ? existingRecord?.action ?? 5 : form.action,
-      connection: isSimpleMode ? existingRecord?.connection ?? 5 : form.connection,
-      expression: isSimpleMode ? existingRecord?.expression ?? 5 : form.expression,
+      action: isSimpleMode ? existingRecord?.action ?? form.action ?? 5 : form.action,
+      connection: isSimpleMode ? existingRecord?.connection ?? form.connection ?? 5 : form.connection,
+      expression: isSimpleMode ? existingRecord?.expression ?? form.expression ?? 5 : form.expression,
       stability: form.stability,
       positiveNote: form.positiveNote.trim(),
       drainNote: form.drainNote.trim(),
       actionNote: form.actionNote.trim(),
       mode: recordMode,
-      templateKey: selectedTemplateKey ?? undefined,
+      quickStateKeys,
+      templateKey: existingRecord?.templateKey,
       createdAt: existingRecord?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -173,15 +211,13 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
   return (
     <section className="space-y-4">
       <div className="rounded-3xl border border-slate-800 bg-slate-900 px-4 py-4">
-        <p className="text-sm text-slate-400">{isYesterday ? '补记昨天' : '今日记录'}</p>
-        <h2 className="mt-1 text-xl font-semibold text-white">
-          {isYesterday ? '昨天状态记录' : '今天状态记录'}
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-slate-300">不用准确，凭第一感觉就行。</p>
+        <p className="text-sm text-slate-400">快速记录</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">选几个接近今天的状态就行。</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-300">不用准确，留下一个状态痕迹就够了。</p>
       </div>
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">记录日期</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">日期选择</p>
         <div className="mt-3 flex gap-2">
           {[{ key: today, label: '今天' }, { key: yesterday, label: '昨天' }].map((item) => (
             <button
@@ -198,119 +234,145 @@ export function RecordPage({ editingDate, onSaved }: RecordPageProps) {
             </button>
           ))}
         </div>
+      </div>
 
-        <p className="mt-4 text-xs uppercase tracking-[0.2em] text-slate-500">记录模式</p>
-        <div className="mt-3 flex gap-2">
-          {(['full', 'simple'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setRecordMode(mode)}
-              className={`rounded-2xl px-4 py-2 text-sm transition ${
-                recordMode === mode
-                  ? 'bg-sky-500/15 text-sky-300'
-                  : 'bg-slate-950/80 text-slate-400 hover:text-white'
-              }`}
-            >
-              {mode === 'full' ? '完整' : '极简'}
-            </button>
-          ))}
-        </div>
+      <div className="space-y-3 rounded-3xl border border-slate-800 bg-slate-900 p-4">
+        <p className="text-sm font-medium text-white">快速记录状态片段</p>
+        {QUICK_STATE_GROUPS.map((group) => (
+          <div key={group.key}>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{group.label}</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {group.options.map((option) => {
+                const isSelected = quickSelections[group.key] === option.key
 
-        <p className="mt-4 text-sm leading-6 text-slate-400">
-          {recordMode === 'full'
-            ? '懒得细调时，选一个接近的状态直接保存。'
-            : '没状态时，只记 3 个核心指标也可以。'}
-        </p>
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => handleQuickStateSelect(group.key, option)}
+                    className={`min-h-14 rounded-2xl border px-3 py-3 text-sm transition ${
+                      isSelected
+                        ? 'border-sky-500/40 bg-sky-500/15 text-sky-200'
+                        : 'border-slate-800 bg-slate-950/80 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">今天状态接近</p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          懒得细调时，选一个接近的状态直接保存。
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {QUICK_TEMPLATES.map((template) => {
-            const isSelected = selectedTemplateKey === template.key
-
-            return (
-              <button
-                key={template.key}
-                type="button"
-                onClick={() => handleTemplateClick(template.key)}
-                className={`rounded-2xl border px-3 py-3 text-left transition ${
-                  isSelected
-                    ? 'border-sky-500/40 bg-sky-500/10'
-                    : 'border-slate-800 bg-slate-950/80 hover:border-slate-700'
-                }`}
-              >
-                <p className="text-sm font-medium text-white">{template.name}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{template.description}</p>
-              </button>
-            )
-          })}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-white">详细分数</p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">默认折叠，不用每次都认真打分。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDetailedScores((value) => !value)}
+            className="rounded-2xl border border-slate-700 px-3 py-2 text-sm text-slate-300"
+          >
+            {showDetailedScores ? '收起' : '展开'}
+          </button>
         </div>
+
+        {showDetailedScores ? (
+          <>
+            <div className="mt-4 flex gap-2">
+              {(['simple', 'full'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setRecordMode(mode)}
+                  className={`rounded-2xl px-4 py-2 text-sm transition ${
+                    recordMode === mode
+                      ? 'bg-sky-500/15 text-sky-300'
+                      : 'bg-slate-950/80 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {mode === 'full' ? '完整' : '极简'}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 space-y-5">
+              {visibleMetrics.map((metric) => (
+                <label key={metric.key} className="block space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-200">{metric.label}</span>
+                    <span className="font-medium text-white">{form[metric.key]}/10</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    step="1"
+                    value={form[metric.key]}
+                    onChange={(event) => handleMetricChange(metric.key, Number(event.target.value))}
+                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-800"
+                    style={{ accentColor: metric.color }}
+                  />
+                </label>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-        <div className="space-y-5">
-          {visibleMetrics.map((metric) => (
-            <label key={metric.key} className="block space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-200">{metric.label}</span>
-                <span className="font-medium text-white">{form[metric.key]}/10</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="10"
-                step="1"
-                value={form[metric.key]}
-                onChange={(event) => handleMetricChange(metric.key, Number(event.target.value))}
-                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-800"
-                style={{ accentColor: metric.color }}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-white">补充记录，可选</p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">不写文字也可以，先留下状态就够了。</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNotes((value) => !value)}
+            className="rounded-2xl border border-slate-700 px-3 py-2 text-sm text-slate-300"
+          >
+            {showNotes ? '收起' : '展开'}
+          </button>
+        </div>
+
+        {showNotes ? (
+          <div className="mt-4 grid gap-3">
+            <label className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">今天让我有感觉的事</p>
+              <textarea
+                rows={3}
+                value={form.positiveNote}
+                onChange={(event) => handleTextChange('positiveNote', event.target.value)}
+                placeholder="例如：今天有什么让你感到一点点亮起来？"
+                className="mt-3 w-full resize-none rounded-2xl border border-slate-800 bg-slate-900 px-3 py-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-500"
               />
             </label>
-          ))}
-        </div>
-      </div>
 
-      <div className="grid gap-3">
-        <label className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">今天让我有感觉的事</p>
-          <textarea
-            rows={3}
-            value={form.positiveNote}
-            onChange={(event) => handleTextChange('positiveNote', event.target.value)}
-            placeholder="例如：今天有什么让你感到一点点亮起来？"
-            className="mt-3 w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-500"
-          />
-        </label>
-
-        {recordMode === 'full' ? (
-          <>
-            <label className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <label className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">今天消耗我的事</p>
               <textarea
                 rows={3}
                 value={form.drainNote}
                 onChange={(event) => handleTextChange('drainNote', event.target.value)}
                 placeholder="例如：什么事情带走了你的注意力和电量？"
-                className="mt-3 w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-500"
+                className="mt-3 w-full resize-none rounded-2xl border border-slate-800 bg-slate-900 px-3 py-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-500"
               />
             </label>
 
-            <label className="rounded-3xl border border-slate-800 bg-slate-900 p-4">
+            <label className="rounded-3xl border border-slate-800 bg-slate-950 p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">今天完成的一个行动</p>
               <textarea
                 rows={3}
                 value={form.actionNote}
                 onChange={(event) => handleTextChange('actionNote', event.target.value)}
                 placeholder="例如：今天真正推进了哪一个现实动作？"
-                className="mt-3 w-full resize-none rounded-2xl border border-slate-800 bg-slate-950 px-3 py-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-500"
+                className="mt-3 w-full resize-none rounded-2xl border border-slate-800 bg-slate-900 px-3 py-3 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-500"
               />
             </label>
-          </>
+          </div>
         ) : null}
       </div>
 

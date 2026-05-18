@@ -15,6 +15,7 @@ export interface StateRecord {
 
   mode?: 'full' | 'simple'
   templateKey?: string
+  quickStateKeys?: string[]
 
   createdAt: string
   updatedAt: string
